@@ -1,7 +1,8 @@
-from gameoflife import *
-from gui import *
-from sys import *
+from gameoflife import Game, Cell
+from gui import GUI
+from sys import stdout
 from copy import deepcopy
+from cmdline import CmdInterface
 
 z = Cell(0)
 o = Cell(1)
@@ -28,4 +29,6 @@ for i in range(1000):
     sys.stdout.flush()
     game.evolve2D()
 """
-GUI(game, delay=100)
+#GUI(game, delay=100)
+cmd = CmdInterface(game)
+cmd.run(1000, 0)
