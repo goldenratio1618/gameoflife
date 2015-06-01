@@ -41,7 +41,7 @@ class Game:
         if adjFunc is None:
             self.adjFunc = lambda pos: Game.stdAdjFunc(self.dim, pos, (), 1)
         else:
-            self.adjFunc = adjFunc
+            self.adjFunc = lambda pos: adjFunc(self.dim, pos, (), 1)
         self.dim = dim
         self.adjGrid = Game.initAdjGrid(self.adjFunc, self.dim, ())
     
@@ -71,11 +71,25 @@ class Game:
             new_pos = pos[0] + j
             if new_pos >= 0 and new_pos < dim[0]:
                 arr += Game.stdAdjFunc(Game.rmFirst(dim), Game.rmFirst(pos),
-                        currTuple + (pos[0] + j,), dist)
+                        currTuple + (new_pos,), dist)
         if len(currTuple) == 0:
             arr.remove(pos)
         return arr
-            
+        
+    @staticmethod
+    def torusAdjFunc(dim, pos, currTuple, dist):
+        """ Returns all adjacent locations to a given position. """
+        if len(dim) == 0:
+            return [currTuple]
+        arr = []
+        for j in range(-dist, dist + 1):
+            new_pos = pos[0] + j
+            arr += Game.torusAdjFunc(Game.rmFirst(dim), Game.rmFirst(pos),
+                    currTuple + (new_pos % dim[0],), dist)
+        if len(currTuple) == 0:
+            arr.remove(pos)
+        return arr
+    
     @staticmethod
     def genRandGrid(dim):
         if len(dim) == 0:

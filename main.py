@@ -7,7 +7,7 @@ from cmdline import CmdInterface
 z = Cell(0)
 o = Cell(1)
 grid = []
-size = 100
+size = 180
 for a in range(size):
     row = []
     for b in range(size):
@@ -21,7 +21,7 @@ grid[size//2][size//2 - 1] = o
 grid[size//2][size//2] = o
 grid[size//2 + 1][size//2] = o
 
-game = Game(grid, dim=(size,size))
+game = Game(grid, dim=(size,size), adjFunc=Game.torusAdjFunc)
 #print(game.adjGrid)
 """
 for i in range(1000):
@@ -31,4 +31,4 @@ for i in range(1000):
 """
 #GUI(game, delay=100)
 cmd = CmdInterface(game)
-cmd.run(1000, 0)
+cmd.run(3000, 0)
