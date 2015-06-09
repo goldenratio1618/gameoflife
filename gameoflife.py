@@ -1,24 +1,27 @@
-import numpy as np
 import random as rand
 from copy import deepcopy
+from math import floor
 
 """ The basic element, representing the entity at each
     individual grid cell. Will be overridden to make other
     games of Life. """
 class Cell:
-    def __init__(self, val=None):
+    def __init__(self, val=None, pr=0.5):
         """ Initializes a cell with the specified value, or a random one if no
         value is provided."""
         if val == None:
-            self.val = Cell.genRandVal()
+            self.val = Cell.genRandVal(pr)
         else:
             self.val = val
         
     @staticmethod
-    def genRandVal():
-        """ Returns a random value for a Cell object
-        (the default is either a 0 or 1) """
-        return rand.randint(0,1)
+    def genRandVal(pr):
+        """ Returns a random value for a Cell object (with probability pr of
+            being alive); the default is either a 0 or 1 """
+        if rand.random() < pr:
+            return 1
+        else:
+            return 0
         
     def __str__(self):
         return str(self.val)
@@ -86,17 +89,88 @@ class Game:
             new_pos = pos[0] + j
             arr += Game.torusAdjFunc(Game.rmFirst(dim), Game.rmFirst(pos),
                     currTuple + (new_pos % dim[0],), dist)
-        if len(currTuple) == 0:
+        if len(currTuple) == 0: 
             arr.remove(pos)
         return arr
     
+    def smallWorldIfy(self, jumpFrac):
+        """ Turns the adjacency grid into a small-world network.
+            The number of random jumps inserted is a proportion of the total
+            number of distinct grid values. Connections are removed."""
+        prod = 1
+        for i in range(len(self.dim)):
+            prod *= self.dim[i]
+        
+        for _ in range(floor(prod * jumpFrac)):
+            # get the location we're about to switch
+            loc = Game.getRandLoc(self.dim)
+            # get all adjacent locations
+            adj = Game.arrOfTuple(self.adjGrid, loc)
+            if len(adj) == 0:
+                continue
+            # this is the one we're switching
+            changePos = rand.randint(0, len(adj) - 1)
+            # remove the other edge to loc
+            adjLoc = Game.arrOfTuple(self.adjGrid, adj[changePos])
+            if loc in adjLoc:
+                adjLoc.remove(loc)
+            # switch edge in loc
+            adj[changePos] = Game.getRandLoc(self.dim, loc)
+            # now add the reverse edge
+            Game.arrOfTuple(self.adjGrid, adj[changePos]).append(loc)
+            
+
+    def smallWorldIfy_noremove(self, jumpFrac):
+        """ Turns the adjacency grid into a small-world network.
+            The number of random jumps inserted is a proportion of the total
+            number of distinct grid values. Note that no connections are
+            removed, so using this method increases overall connectivity of the
+            grid (in slight deviation with Strogatz & Watts's model)."""
+        prod = 1
+        for i in range(len(self.dim)):
+            prod *= self.dim[i]
+        
+        for _ in range(floor(prod * jumpFrac)):
+            # get the location we're about to switch
+            loc = Game.getRandLoc(self.dim)
+            # append a random location to our adjacent locations, and vice versa
+            randLoc = Game.getRandLoc(self.dim, loc)
+            Game.arrOfTuple(self.adjGrid, loc).append(randLoc)
+            Game.arrOfTuple(self.adjGrid, randLoc).append(loc)
+            
+    
     @staticmethod
-    def genRandGrid(dim):
+    def arrOfTuple(a, t):
+        """ Returns the position in an array corresponding to a given tuple. """
+        x = a
+        for i in t:
+            x = x[i]
+        return x
+        
+    @staticmethod
+    def smallWorldAdjFunc(prevAdjFunc, dim, pos, currTuple, dist, jumpProb):
+        """ Implements the previous adjacency function, with a probability of
+            the random jumps characteristic of small-world networks. """
+        arr = prevAdjFunc(dim, pos, currTuple, dist)
+        if rand.random() < jumpProb:
+            arr[rand.randint(0, len(arr) - 1)] = Game.getRandLoc(dim)
+        return arr
+        
+    @staticmethod
+    def getRandLoc(dim, loc=None):
+        """ Generates a random location in the grid, that isn't loc. """
+        newLoc = tuple(rand.randint(0, dim[i] - 1) for i in range(len(dim)))
+        while newLoc == loc:
+            newLoc = tuple(rand.randint(0, dim[i] - 1) for i in range(len(dim)))
+        return newLoc
+        
+    @staticmethod
+    def genRandGrid(dim, prob=0.5):
         if len(dim) == 0:
-            return Cell()
+            return Cell(pr=prob)
         arr = []
         for i in range(dim[0]):
-            arr.append(Game.genRandGrid(Game.rmFirst(dim)))
+            arr.append(Game.genRandGrid(Game.rmFirst(dim), prob))
         return arr
     
     @staticmethod
