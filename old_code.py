@@ -45,3 +45,28 @@ class Cell:
                 s += ", "
         s += "]"
         return s
+     
+    @staticmethod
+    def rmFirst(t):
+        """ Removes the first element of a tuple. """
+        return tuple(t[i] for i in range(1, len(t)))
+        
+        
+    
+    @autojit
+    def evolve2D(self):
+        """ The original evolve function of the game of life. Assumes possible
+            states are 0 (dead) and 1 (alive), and that the grid is 2D. """
+        if len(self.dim) != 2:
+            raise ValueError("ERROR: evolve2D only works with 2D grids.")
+        # copy the grid so that further changes aren't decided by previous ones
+        gr = deepcopy(self.grid)
+        for i in range(self.dim[0]):
+            for j in range(self.dim[1]):
+                numAlive = 0
+                for adj in self.adjGrid[i,j]:
+                    numAlive += gr[adj]
+                if numAlive < 2 or numAlive > 3:
+                    self.grid[i,j] = 0
+                elif numAlive == 3 and self.grid[i,j] == 0:
+                    self.grid[i,j] = 1
