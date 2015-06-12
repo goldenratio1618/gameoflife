@@ -1,9 +1,10 @@
-from gameoflife import Game, genRandGrid, torusAdjFunc
+from gameoflife import Game, genRandGrid, torusAdjFunc, convAdjGrid
 from gui import GUI
 from sys import stdout
 from copy import deepcopy
 from cmdline import CmdInterface
 from timeit import default_timer as timer
+import numpy as np
 
 
 grid = []
@@ -21,8 +22,10 @@ grid[size//2][size//2 - 1] = 1
 grid[size//2][size//2] = 1
 grid[size//2 + 1][size//2] = 1
 
-game = Game(genRandGrid((size, size), prob=0.5), dim=(size,size), adjFunc=torusAdjFunc)
+dim = np.array([size,size])
+game = Game(genRandGrid(dim, prob=0.5), dim, torusAdjFunc)
 game.smallWorldIfy(1)
+game.adjGrid = convAdjGrid(game.adjGrid, game.dim)
 #print(game.adjGrid)
 """
 for i in range(1000):
@@ -32,10 +35,11 @@ for i in range(1000):
 """
 #GUI(game, delay=100)
 cmd = CmdInterface(game)
+steps = 1000
 start = timer()
-cmd.run(100, 0, 0, False)
+cmd.run(steps, 0, 0, False)
 dt = timer() - start
-print("100 evolve steps created in %f s" % dt)
+print(str(steps) + " evolve steps created in %f s" % dt)
 """
 ORIGINAL (before Numpy refactoring):
 45.74s for only printing
@@ -44,5 +48,13 @@ ORIGINAL (before Numpy refactoring):
 UPDATE 1 (after Numpy refactoring, before CPU compilation with Accelerate):
 100.59s for only evolving the game (no printing)
 
+UPDATE 2 (after Numpy refactoring for adjGrid as well, no Accelerate):
+169.77s
 
+UPDATE 3 (after Numpy refactoring, including int8 for adjGrid, still no Accelerate):
+1120.25s
+
+UPDATE 4 (code tweak)
+
+UPDATE 4 
 """

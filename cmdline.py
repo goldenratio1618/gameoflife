@@ -8,7 +8,6 @@ class CmdInterface:
     def __init__(self, game):
         self.game = game
     
-    @autojit
     def run(self, steps, delay, initDelay, printFlag):
         """ Runs the Command-Line interface for a specified number of steps,
             or forever if the number of steps is specified to be -1."""
