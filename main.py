@@ -1,4 +1,4 @@
-from gameoflife import Game, genRandGrid, torusAdjFunc, convAdjGrid
+from gameoflife import Game, genRandGrid, torusAdjFunc, convAdjGrid, configure
 from gui import GUI
 from sys import stdout
 from copy import deepcopy
@@ -6,7 +6,7 @@ from cmdline import CmdInterface
 from timeit import default_timer as timer
 import numpy as np
 
-
+begin = timer()
 grid = []
 size = 192
 for a in range(size):
@@ -26,6 +26,9 @@ dim = np.array([size,size])
 game = Game(genRandGrid(dim, prob=0.5), dim, torusAdjFunc)
 game.smallWorldIfy(1)
 game.adjGrid = convAdjGrid(game.adjGrid, game.dim)
+tp = configure(game.grid, game.adjGrid)
+game.grid = tp[0]
+game.adjGrid = tp[1]
 #print(game.adjGrid)
 """
 for i in range(1000):
@@ -36,8 +39,11 @@ for i in range(1000):
 #GUI(game, delay=100)
 cmd = CmdInterface(game)
 steps = 1000
+delay = timer() - begin
+print("Setup time: " + str(delay))
+
 start = timer()
-cmd.run(steps, 0, 0, False)
+cmd.run(steps, 0, 0, False, -1)
 dt = timer() - start
 print(str(steps) + " evolve steps created in %f s" % dt)
 """
@@ -55,6 +61,12 @@ UPDATE 3 (after Numpy refactoring, including int8 for adjGrid, still no Accelera
 1120.25s
 
 UPDATE 4 (code tweak)
+490.39s
 
-UPDATE 4 
+UPDATE 5 ("configuring" grid and AdjGrid to remove IF statement - still no Accelerate):
+469.4
+
+UPDATE 6 (add AUTOJIT acceleration):
+2.05s
+
 """

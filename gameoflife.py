@@ -121,7 +121,29 @@ def genRandGrid(dim, prob=0.5):
     intGrid[alive] = 1
     return intGrid
     
+def addToTuple(tp, num):
+    l = len(tp)
+    newTp = np.array(tp)
+    for i in range(l):
+        newTp[i] += num
+    return tuple(newTp)
+
+def configure(grid, adjGrid):
+    """ Configures grid and adjGrid for higher efficiency, i.e no using that
+        troublesome if statement. """
+    dim = addToTuple(grid.shape, 1)
+    newGrid = np.zeros(dim, dtype=np.int8)
+    it = np.nditer(grid, flags=['multi_index'], op_flags=['readonly'])
+    while not it.finished:
+        newGrid[addToTuple(it.multi_index, 1)] = grid[it.multi_index]
+        it.iternext()
     
+    newAdjGrid = np.empty_like(adjGrid)
+    it = np.nditer(grid, flags=['multi_index'], op_flags=['readonly'])
+    while not it.finished:
+        newAdjGrid[it.multi_index] = adjGrid[it.multi_index] + 1
+        it.iternext()
+    return (newGrid, newAdjGrid)
     
     
 """ Evolution methods. These are placed outside the class for clarity, and to
@@ -131,8 +153,7 @@ def evolve(dim, grid, adjGrid):
         Works for grids of any dimension, but may be slower."""
     # copy the grid so that further changes aren't decided by previous ones
     newGrid = np.zeros(dim, dtype=np.int8)
-    it = np.nditer(grid, flags=['multi_index', 'refs_ok'],
-        op_flags=['readonly'])
+    it = np.nditer(grid, flags=['multi_index'], op_flags=['readonly'])
     while not it.finished:
         numAlive = 0
         for adj in adjGrid[it.multi_index]:
@@ -143,24 +164,26 @@ def evolve(dim, grid, adjGrid):
             newGrid[it.multi_index] = 1
         it.iternext()
     return newGrid
-
-
-def evolve2D(rows, cols, grid, adjGrid, newGrid):
+   
+@autojit
+def evolve2D(rows, cols, grid, adjGrid):
     """ Like evolve, but only compatible with 2D arrays. Uses loops rather than
         iterators, so hopefully easier to parallelize. Assumes grid and adjGrid
-        are what they should be for dim = [rows, cols]"""
+        are what they should be for dim = [rows, cols] (AND ARE CONFIGURED.)"""
+    newGrid = np.zeros_like(grid)
     maxLen = len(adjGrid[0,0])
-    for i in range(rows):
-        for j in range(cols):
+    # first row and column are 0s according to configure - they should stay that
+    for i in range(1,rows+1):
+        for j in range(1,cols+1):
             numAlive = 0
             for k in range(maxLen):
-                x = adjGrid[i,j,k]
-                # avoid placeholder values
-                if x[0] is not -1:
-                    numAlive += grid[x[0], x[1]]
+                # if adjGrid is configured, a placeholder value of (-1, -1) will
+                # result in a 0 being looked up in grid.
+                numAlive += grid[adjGrid[i-1,j-1,k,0], adjGrid[i-1,j-1,k,1]]
 
             if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
                 newGrid[i,j] = 1
+    return newGrid
     
 class Game:
     """ Initializes the  The grid will be a numpy array of Cell objects.
@@ -179,9 +202,7 @@ class Game:
         self.adjGrid = initAdjGrid(self.adjFunc, self.dim)
     
     def evolve2D_self(self):
-        newGrid = np.zeros((self.dim[0], self.dim[1]), dtype=np.int8)
-        evolve2D(self.dim[0], self.dim[1], self.grid, self.adjGrid, newGrid)
-        self.grid = newGrid
+        self.grid = evolve2D(self.dim[0], self.dim[1], self.grid, self.adjGrid)
     
     def smallWorldIfy(self, jumpFrac):
         """ Turns the adjacency grid into a small-world network.
