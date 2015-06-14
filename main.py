@@ -2,13 +2,13 @@ from gameoflife import Game, genRandGrid, torusAdjFunc, convAdjGrid, configure
 from gui import GUI
 from sys import stdout
 from copy import deepcopy
-from cmdline import CmdInterface
+from cmdline import run, run_GPU
 from timeit import default_timer as timer
 import numpy as np
 
 begin = timer()
 grid = []
-size = 192
+size = 1024
 for a in range(size):
     row = []
     for b in range(size):
@@ -37,15 +37,18 @@ for i in range(1000):
     game.evolve2D()
 """
 #GUI(game, delay=100)
-cmd = CmdInterface(game)
-steps = 1000
+steps = 50
 delay = timer() - begin
 print("Setup time: " + str(delay))
 
 start = timer()
-cmd.run(steps, 0, 0, False, -1)
+run_GPU(game.grid, game.adjGrid, steps, 0, 0, -1, -1)
 dt = timer() - start
-print(str(steps) + " evolve steps created in %f s" % dt)
+print(str(steps) + " evolve steps created in %f s on GPU" % dt)
+start = timer()
+run(game, steps, 0, 0, -1, -1)
+dt = timer() - start
+print(str(steps) + " evolve steps created in %f s on CPU" % dt)
 """
 ORIGINAL (before Numpy refactoring):
 45.74s for only printing
@@ -64,9 +67,17 @@ UPDATE 4 (code tweak)
 490.39s
 
 UPDATE 5 ("configuring" grid and AdjGrid to remove IF statement - still no Accelerate):
-469.4
+469.4s
 
 UPDATE 6 (add AUTOJIT acceleration):
-2.05s
+1.32s
 
+**FASTER PERFORMANCE => MORE TESTS. FROM NOW ON, USING 5000 ITERATIONS**
+5.77s
+
+UPDATE 7 (with GPU enabled, Phase 1):
+8.24s
+
+UPDATE 8 (GPU enabled, Phase 2):
+4.99s
 """

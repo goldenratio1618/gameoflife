@@ -166,24 +166,44 @@ def evolve(dim, grid, adjGrid):
     return newGrid
    
 @autojit
-def evolve2D(rows, cols, grid, adjGrid):
+def evolve2D(rows, cols, grid, adjGrid, newGrid):
     """ Like evolve, but only compatible with 2D arrays. Uses loops rather than
         iterators, so hopefully easier to parallelize. Assumes grid and adjGrid
         are what they should be for dim = [rows, cols] (AND ARE CONFIGURED.)"""
-    newGrid = np.zeros_like(grid)
     maxLen = len(adjGrid[0,0])
-    # first row and column are 0s according to configure - they should stay that
-    for i in range(1,rows+1):
-        for j in range(1,cols+1):
+    for i in range(rows):
+        for j in range(cols):
             numAlive = 0
             for k in range(maxLen):
                 # if adjGrid is configured, a placeholder value of (-1, -1) will
                 # result in a 0 being looked up in grid.
-                numAlive += grid[adjGrid[i-1,j-1,k,0], adjGrid[i-1,j-1,k,1]]
+                numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
 
             if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
-                newGrid[i,j] = 1
-    return newGrid
+                newGrid[i+1,j+1] = 1
+
+
+@cuda.jit(argtypes=[uint8[:,:], uint16[:,:,:,:], uint8[:,:]])
+def evolve2D_kernel(grid, adjGrid, newGrid):
+    """ Like evolve, but only compatible with 2D arrays. Uses loops rather than
+        iterators, so hopefully easier to parallelize. Assumes grid and adjGrid
+        are what they should be for dim = dimArr[0:1] (AND ARE CONFIGURED.)
+        dimArr is [rows, cols, maxLen]"""
+    rows = grid.shape[0] - 1
+    maxLen = adjGrid.shape[2]
+    cols = grid.shape[1] - 1
+    startX, startY = cuda.grid(2)
+    gridX = cuda.gridDim.x * cuda.blockDim.x;
+    gridY = cuda.gridDim.y * cuda.blockDim.y;
+    for i in range(startX, rows, gridX):
+        for j in range(startY, cols, gridY):
+            numAlive = 0
+            for k in range(maxLen):
+                # if adjGrid is configured, a placeholder value of (-1, -1) will
+                # result in a 0 being looked up in grid.
+                numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
+            if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
+                newGrid[i+1,j+1] = 1
     
 class Game:
     """ Initializes the  The grid will be a numpy array of Cell objects.
@@ -202,7 +222,9 @@ class Game:
         self.adjGrid = initAdjGrid(self.adjFunc, self.dim)
     
     def evolve2D_self(self):
-        self.grid = evolve2D(self.dim[0], self.dim[1], self.grid, self.adjGrid)
+        newGrid = np.zeros_like(self.grid)
+        evolve2D(self.dim[0], self.dim[1], self.grid, self.adjGrid, newGrid)
+        self.grid = newGrid
     
     def smallWorldIfy(self, jumpFrac):
         """ Turns the adjacency grid into a small-world network.

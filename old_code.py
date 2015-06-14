@@ -70,3 +70,44 @@ class Cell:
                     self.grid[i,j] = 0
                 elif numAlive == 3 and self.grid[i,j] == 0:
                     self.grid[i,j] = 1
+                    
+                    
+@cuda.jit(argtypes=[uint32, uint32, uint8[:,:], uint16[:,:,:,:]])
+""" Like evolve, but only compatible with 2D arrays. Uses loops rather than
+        iterators, so hopefully easier to parallelize. Assumes grid and adjGrid
+        are what they should be for dim = dimArr[0:1] (AND ARE CONFIGURED.)
+        dimArr is [rows, cols, maxLen]"""
+    rows = grid.shape[0] - 1
+    maxLen = adjGrid.shape[2]
+    cols = grid.shape[1] - 1
+    # we'll only parallelize two dimensions - the third for loop may be quite
+    # short, and thus not worth parallelizing as some cores may be idle.
+    startX, startY = cuda.grid
+    gridX = cuda.gridDim.x * cuda.blockDim.x;
+    gridY = cuda.gridDim.y * cuda.blockDim.y;
+    for i in range(startX, rows, gridX):
+        for j in range(startY, cols, gridY):
+            numAlive = 0
+            for k in range(maxLen):
+                # if adjGrid is configured, a placeholder value of (-1, -1) will
+                # result in a 0 being looked up in grid.
+                numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
+
+            if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
+                newGrid[i+1,j+1] = 1
+                
+                
+                
+                
+ 
+
+def countLiveCells(grid, adjGrid, i, j, maxLen):
+    numAlive = 0
+    for k in range(maxLen):
+        # if adjGrid is configured, a placeholder value of (-1, -1) will
+        # result in a 0 being looked up in grid.
+        numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
+    return numAlive
+    
+countLiveCells_GPU = cuda.jit(restype=uint8, argtypes=[uint8[:,:], 
+    uint16[:,:,:,:], uint16, uint16, uint16], device=True)(countLiveCells)
