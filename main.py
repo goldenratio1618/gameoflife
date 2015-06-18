@@ -1,4 +1,4 @@
-from gameoflife import Game, genRandGrid, torusAdjFunc, convAdjGrid, configure
+from gameoflife import Game, genRandGrid, torusAdjFunc, convAdjGrid, configure, smallWorldAdjFunc
 from gui import GUI
 from sys import stdout
 from copy import deepcopy
@@ -6,9 +6,9 @@ from cmdline import run, run_GPU
 from timeit import default_timer as timer
 import numpy as np
 
-begin = timer()
-grid = []
-size = 1024
+#grid = []
+size = 512
+"""
 for a in range(size):
     row = []
     for b in range(size):
@@ -20,15 +20,16 @@ grid[size//2 - 1][size//2] = 1
 grid[size//2 - 1][size//2 + 1] = 1
 grid[size//2][size//2 - 1] = 1
 grid[size//2][size//2] = 1
-grid[size//2 + 1][size//2] = 1
+grid[size//2 + 1][size//2] = 1"""
 
 dim = np.array([size,size])
-game = Game(genRandGrid(dim, prob=0.5), dim, torusAdjFunc)
-game.smallWorldIfy(1)
-game.adjGrid = convAdjGrid(game.adjGrid, game.dim)
-tp = configure(game.grid, game.adjGrid)
-game.grid = tp[0]
-game.adjGrid = tp[1]
+#game = Game(genRandGrid(dim, prob=0.5), dim, lambda d, pos, currTuple, dist:
+#            smallWorldAdjFunc(torusAdjFunc, d, pos, currTuple, dist, 1))
+start = timer()
+grid = genRandGrid(dim, prob=0.5)
+dt = timer() - start
+print("Time to generate grid: %f" % dt)
+game = Game(grid, dim, torusAdjFunc)
 #print(game.adjGrid)
 """
 for i in range(1000):
@@ -38,8 +39,6 @@ for i in range(1000):
 """
 #GUI(game, delay=100)
 steps = 50
-delay = timer() - begin
-print("Setup time: " + str(delay))
 
 start = timer()
 run_GPU(game.grid, game.adjGrid, steps, 0, 0, -1, -1)

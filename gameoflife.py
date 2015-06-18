@@ -3,74 +3,119 @@ from math import floor
 from numbapro import cuda
 from numba import *
 import numpy as np
+from timeit import default_timer as timer
 
 """ Below are a variety of adjacency functions, which can be used
     to generate grids of various topologies for the Game of Life. """
     
-def stdAdjFunc(dim, pos, currTuple, dist):
+def stdAdjFunc(coord, dim):
     """ Returns all adjacent locations to a given position.
         Uses standard layout (with special edge/corner cases)"""
-    if len(dim) == 0:
-        return [currTuple]
-    arr = []
-    for j in range(-dist, dist + 1):
-        new_pos = pos[0] + j
-        if new_pos >= 0 and new_pos < dim[0]:
-            arr += stdAdjFunc(dim[1:], rmFirst(pos), currTuple + (new_pos,), dist)
-    if len(currTuple) == 0:
-        arr.remove(pos)
-    return arr
-    
-def torusAdjFunc(dim, pos, currTuple, dist):
+    ldim = len(dim)
+    pos = coord[0:ldim]
+    val = coord[ldim]
+    # this adjacency function does not use this many adjacent locations
+    if val >= 3 ** ldim - 1:
+        return np.full(ldim, ldim)
+    arr = dirFromNum(val, ldim)
+    adj = np.add(arr, coord)
+
+    for pos in adj:
+        # position is not in grid; return "blank"
+        if pos < 0 or pos >= ldim:
+            return np.full(ldim, ldim)
+
+    return adj
+   
+def torusAdjFunc(coord, dim):
     """ Returns all adjacent locations to a given position.
         Wraps around at edges and corners. """
-    if len(dim) == 0:
-        return [currTuple]
-    arr = []
-    for j in range(-dist, dist + 1):
-        new_pos = pos[0] + j
-        arr += torusAdjFunc(dim[1:], rmFirst(pos),
-            currTuple + (new_pos % dim[0],), dist)
-    if len(currTuple) == 0:
-        arr.remove(pos)
-    return arr
+    ldim = len(dim)
+    pos = coord[0:ldim]
+    # this adjacency function does not use this many adjacent locations
+    val = coord[ldim]
+    if val >= 3 ** ldim - 1:
+        return np.full(ldim, ldim)
+    arr = dirFromNum(val, ldim)
+    adj = np.add(arr, pos)
+
+    for i in range(ldim):
+        if adj[i] < 0:
+            adj[i] += ldim
+        elif adj[i] >= ldim:
+            adj[i] -= ldim
+
+    return adj
     
 def smallWorldAdjFunc(prevAdjFunc, dim, pos, currTuple, dist, jumpProb):
-    """ Implements the previous adjacency function, with a probability of
+    """ Implements a small-world adjacency function.
+
+        Implements the previous adjacency function, with a probability of
         the random jumps characteristic of small-world networks.
         Unlike smallWorldIfy, this does NOT generate bidirectional
-        small-world networks, but instead introduces one-way "wormholes"."""
-    arr = prevAdjFunc(dim, pos, currTuple, dist)
+        small-world networks, but instead introduces one-way "wormholes".
+        Also, note that with this adjacency function, all outputs are of
+        equal length - this means that every space has the same number of
+        outgoing edges, but not necessarily the same number of incoming edges.
+        The way the RNG works here is, for each edge there is a probability
+        of it being replaced with a completely random edge.
+
+        Note that "overrandom" networks, with more than 8 connections, can be
+        created by using this function with a high jumpProb, and with extra 
+        space (see initAdjGrid) """
     if np.random.random() < jumpProb:
-        arr[np.random.randint(0, len(arr))] = getRandLoc(dim)
-    return arr
+        return np.array(getRandLoc(dim))
+    else:
+        return prevAdjFunc(dim, pos, currTuple, dist)
   
   
   
   
 
 """ Below are a variety of useful operations on the grid. """
+def dirFromNum(val, ldim):
+    """ Returns the direction corresponding to an integer.
+
+        Used to generate adjacency tables (i.e. the "space"). Operates using
+        base 3, but excludes same point (0,0,...,0). Assumes the grid
+        is Cartesian. Output will be a difference vector in the form of an
+        array, which must be added to the current vector. """
+    maxVal = 3 ** ldim - 1
+    if val > maxVal / 2:
+        val += 1
+    arr = np.zeros(ldim, dtype=np.int32)
+    # convert to base 3, for the conversion
+    for i in range(ldim):
+        arr[ldim - i - 1] = val % 3 - 1
+        val = val // 3
+    return arr
+
 def rmFirst(t):
     """ Removes the first element of a tuple. """
     return tuple(t[i] for i in range(1, len(t)))
 
-def initAdjGrid(adjFunc, dim):
+def initAdjGrid(adjFunc, dim, extraSpace):
     """ Initializes a grid from an adjacency function.
     
-        Elements of the grid are lists of coordinates of adjacent
-        points, according to the adjacency function.
-    """
-    adjGrid = np.empty(tuple(dim), dtype=object)
-    it = np.nditer(adjGrid, flags=['multi_index', 'refs_ok'],
-        op_flags=['writeonly'])
+        Elements of the grid are arrays of coordinates (in array form) 
+        of adjacent points, according to the adjacency function. The amount
+        of extra connections that can be added is specified by the extraSpace
+        parameter. """
+    
+    ldim = len(dim)
+    buffer = (3 ** ldim - 1) * extraSpace
+    adjGrid = np.zeros(tuple(dim) + (buffer * extraSpace, ldim), dtype=np.int32)
+    # the array we iterate over, to get the multi_index of the iterator
+    iter_arr = np.empty(tuple(dim) + (buffer * extraSpace,), dtype=np.int8)
+    it = np.nditer(iter_arr, flags=['multi_index'])
     while not it.finished:
-        adjGrid[it.multi_index] = adjFunc(it.multi_index)
+        adjGrid[it.multi_index] = adjFunc(np.array(it.multi_index), dim)
         it.iternext()
     return adjGrid
     
 def convAdjGrid(adjGrid, dim):
     """ Converts the adjacency grid from a Numpy object array to the much more
-        efficient int16 array (which supports grids up to 32767 rows or columns)
+        efficient int32 array (which supports grids up to 32767 rows or columns)
         
         So as to enable Numpy to store this array as an array of integers,
         rather than objects (in particular, lists of tuples), "placeholder"
@@ -91,14 +136,14 @@ def convAdjGrid(adjGrid, dim):
             maxLen = len(adjGrid[it.multi_index])
         it.iternext()
     # number of elements in each tuple is the number of dimensions
-    newGrid = np.full(size + (maxLen, len(dim)), -1, dtype=np.int16)
+    newGrid = np.full(size + (maxLen, len(dim)), -1, dtype=np.int32)
     it = np.nditer(adjGrid, flags=['multi_index', 'refs_ok'],
         op_flags=['readonly'])
     while not it.finished:
         for adjPos in range(len(adjGrid[it.multi_index])):
             for coord in range(len(dim)):
                 # copy element over to new grid
-                newGrid[it.multi_index][adjPos][coord] =\
+                newGrid[it.multi_index][adjPos][coord] = \
                     adjGrid[it.multi_index][adjPos][coord]
         it.iternext()
     return newGrid
@@ -113,11 +158,10 @@ def getRandLoc(dim, loc=None):
     return newLoc
     
 def genRandGrid(dim, prob=0.5):
-    """ Generates a random grid, with each cell having a given probability
-        of being alive. """
+    """ Generates a random grid with a given cell density. """
     grid = np.random.random(tuple(dim))
     alive = grid < prob
-    intGrid = np.zeros(tuple(dim), dtype=np.int8) # make an integer grid
+    intGrid = np.zeros(tuple(dim + 1), dtype=np.int8) # make an integer grid
     intGrid[alive] = 1
     return intGrid
     
@@ -148,6 +192,7 @@ def configure(grid, adjGrid):
     
 """ Evolution methods. These are placed outside the class for clarity, and to
     enable easier compiling or parallelization."""
+
 def evolve(dim, grid, adjGrid):
     """ The original evolve function of the game of life. 
         Works for grids of any dimension, but may be slower."""
@@ -175,52 +220,59 @@ def evolve2D(rows, cols, grid, adjGrid, newGrid):
         for j in range(cols):
             numAlive = 0
             for k in range(maxLen):
-                # if adjGrid is configured, a placeholder value of (-1, -1) will
+                # if adjGrid is configured, a placeholder value of (-1, -1)
+                # will
                 # result in a 0 being looked up in grid.
                 numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
 
             if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
-                newGrid[i+1,j+1] = 1
+                newGrid[i + 1,j + 1] = 1
 
 
-@cuda.jit(argtypes=[uint8[:,:], uint16[:,:,:,:], uint8[:,:]])
+@cuda.jit(argtypes=[uint8[:,:], uint32[:,:,:,:], uint8[:,:]])
 def evolve2D_kernel(grid, adjGrid, newGrid):
     """ Like evolve, but only compatible with 2D arrays. Uses loops rather than
         iterators, so hopefully easier to parallelize. Assumes grid and adjGrid
         are what they should be for dim = dimArr[0:1] (AND ARE CONFIGURED.)
-        dimArr is [rows, cols, maxLen]"""
+        dimArr is [rows, cols, maxLen] """
     rows = grid.shape[0] - 1
     maxLen = adjGrid.shape[2]
     cols = grid.shape[1] - 1
     startX, startY = cuda.grid(2)
-    gridX = cuda.gridDim.x * cuda.blockDim.x;
-    gridY = cuda.gridDim.y * cuda.blockDim.y;
+    gridX = cuda.gridDim.x * cuda.blockDim.x
+    gridY = cuda.gridDim.y * cuda.blockDim.y
     for i in range(startX, rows, gridX):
         for j in range(startY, cols, gridY):
             numAlive = 0
             for k in range(maxLen):
-                # if adjGrid is configured, a placeholder value of (-1, -1) will
+                # if adjGrid is configured, a placeholder value of (-1, -1)
+                # will
                 # result in a 0 being looked up in grid.
                 numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
             if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
-                newGrid[i+1,j+1] = 1
+                newGrid[i + 1,j + 1] = 1
     
 class Game:
-    """ Initializes the  The grid will be a numpy array of Cell objects.
-        It is possible to specify the grid, the dimension, and/or the adjacency
-        function. """
-    def __init__(self, grid=None, dim=np.array([10,10]), adjFunc=None):
+    """ Initializes the game of life.
+        The grid will be a numpy array of int8s, i.e. the alive/dead state,
+        such that the last row and column are all 0s, and will always remain 0
+        (this is so direct array indexing is possible, without having
+        conditional statements). The specified dimension must be the dimension
+        of the "real" grid, i.e. not including that last row and column.
+        The adjacency function can be used to specify the geometry of the
+        grid. """
+    def __init__(self, grid=None, dim=np.array([10,10]),
+                 adjFunc=stdAdjFunc, extraSpace=1):
         if grid is None:
             self.grid = genRandGrid(dim)
         else:
             self.grid = grid
-        if adjFunc is None:
-            self.adjFunc = lambda pos: stdAdjFunc(self.dim, pos, (), 1)
-        else:
-            self.adjFunc = lambda pos: adjFunc(self.dim, pos, (), 1)
         self.dim = dim
-        self.adjGrid = initAdjGrid(self.adjFunc, self.dim)
-    
+        start = timer()
+        self.adjGrid = initAdjGrid(adjFunc, self.dim, extraSpace)
+        dt = timer() - start
+        print("Time to generate adjGrid: %f" % dt)
+
     def evolve2D_self(self):
         newGrid = np.zeros_like(self.grid)
         evolve2D(self.dim[0], self.dim[1], self.grid, self.adjGrid, newGrid)
@@ -273,7 +325,8 @@ class Game:
         for _ in range(floor(prod * jumpFrac)):
             # get the location we're about to switch
             loc = getRandLoc(self.dim)
-            # append a random location to our adjacent locations, and vice versa
+            # append a random location to our adjacent locations, and vice
+            # versa
             randLoc = getRandLoc(self.dim, loc)
             self.adjGrid[loc].append(randLoc)
             self.adjGrid[randLoc].append(loc)

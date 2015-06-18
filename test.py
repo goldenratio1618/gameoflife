@@ -1,6 +1,12 @@
-from numpy import *
+import numpy as np
+from timeit import default_timer as timer
+from gameoflife import *
 
-def adjFunc(pos):
-        arr = [(1,0), (-1,0), (0,1), (0,-1)]
-        return [tuple(pos[j] + arr[i][j] for j in range(len(arr[i]))) for i in range(len(arr))]
-        
+size = 1000
+start = timer()
+coord = np.array((0,0,0))
+for i in range(size * size):
+    junk = torusAdjFunc(coord, np.array([512,512]))
+dt = timer() - start
+print("Time to run adjFunc 1000 times: %f" % dt)
+# torusAdjFunc: 10.59 seconds
