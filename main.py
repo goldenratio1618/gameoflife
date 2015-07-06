@@ -42,7 +42,7 @@ for i in range(1000):
 steps = 500
 
 start = timer()
-run_GPU(game.grid, game.adjGrid, steps, 0, 0, 1, -1)
+grid = run_GPU(game.grid, game.adjGrid, steps, 0, 0, 1, -1)
 dt = timer() - start
 print(str(steps) + " evolve steps created in %f s on GPU" % dt)
 #start = timer()
@@ -51,10 +51,10 @@ print(str(steps) + " evolve steps created in %f s on GPU" % dt)
 #print(str(steps) + " evolve steps created in %f s on CPU" % dt)
 
 f = open("output7615.txt", "w")
-f.writelines(gridToStr2D(game.grid))
+f.writelines(gridToStr2D(grid))
 f.writelines("\n\n\n")
-f.writelines("# Live Cells = " + str(countLiveCells(game.grid)) + "\n")
-f.writelines("Cluster = " + str(cluster(game.grid, game.adjGrid)))
+f.writelines("# Live Cells = " + str(countLiveCells(grid)) + "\n")
+f.writelines("Cluster = " + str(cluster(grid, game.adjGrid)))
 f.close()
 
 """

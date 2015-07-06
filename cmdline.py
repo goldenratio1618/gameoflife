@@ -11,7 +11,7 @@ def run_GPU(grid, adjGrid, steps, delay, initDelay, printInd, indSteps):
         or forever if the number of steps is specified to be -1.
         Note that here, grid and adjGrid must be explicitly specified as
         opposed to passed in as a Game, to enable everything to be run on the
-        GPU. """
+        GPU. Returns the final grid state. """
     step = 0
     dim = grid.shape
     # move arrays to GPU
@@ -39,6 +39,7 @@ def run_GPU(grid, adjGrid, steps, delay, initDelay, printInd, indSteps):
             sleep(initDelay)
         step += 1
     d_grid.to_host()
+    return grid
 
     
 def run(game, steps, delay, initDelay, printInd, indSteps):
