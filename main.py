@@ -1,5 +1,6 @@
-from gameoflife import Game, genRandGrid, torusAdjFunc, convAdjGrid, configure, smallWorldAdjFunc
+from gameoflife import *
 from gui import GUI
+from gridtools import cluster, countLiveCells
 from sys import stdout
 from copy import deepcopy
 from cmdline import run, run_GPU
@@ -7,7 +8,7 @@ from timeit import default_timer as timer
 import numpy as np
 
 #grid = []
-size = 512
+size = 192
 """
 for a in range(size):
     row = []
@@ -38,16 +39,24 @@ for i in range(1000):
     game.evolve2D()
 """
 #GUI(game, delay=100)
-steps = 50
+steps = 500
 
 start = timer()
-run_GPU(game.grid, game.adjGrid, steps, 0, 0, -1, -1)
+run_GPU(game.grid, game.adjGrid, steps, 0, 0, 1, -1)
 dt = timer() - start
 print(str(steps) + " evolve steps created in %f s on GPU" % dt)
-start = timer()
-run(game, steps, 0, 0, -1, -1)
-dt = timer() - start
-print(str(steps) + " evolve steps created in %f s on CPU" % dt)
+#start = timer()
+#run(game, steps, 0, 0, 1, -1)
+#dt = timer() - start
+#print(str(steps) + " evolve steps created in %f s on CPU" % dt)
+
+f = open("output7615.txt", "w")
+f.writelines(gridToStr2D(game.grid))
+f.writelines("\n\n\n")
+f.writelines("# Live Cells = " + str(countLiveCells(game.grid)) + "\n")
+f.writelines("Cluster = " + str(cluster(game.grid, game.adjGrid)))
+f.close()
+
 """
 ORIGINAL (before Numpy refactoring):
 45.74s for only printing

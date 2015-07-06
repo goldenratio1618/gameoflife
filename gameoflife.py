@@ -16,14 +16,14 @@ def stdAdjFunc(coord, dim):
     val = coord[ldim]
     # this adjacency function does not use this many adjacent locations
     if val >= 3 ** ldim - 1:
-        return np.full(ldim, ldim)
+        return dim
     arr = dirFromNum(val, ldim)
     adj = np.add(arr, coord)
 
     for pos in adj:
         # position is not in grid; return "blank"
         if pos < 0 or pos >= ldim:
-            return np.full(ldim, ldim)
+            return dim
 
     return adj
    
@@ -41,9 +41,9 @@ def torusAdjFunc(coord, dim):
 
     for i in range(ldim):
         if adj[i] < 0:
-            adj[i] += ldim
-        elif adj[i] >= ldim:
-            adj[i] -= ldim
+            adj[i] += dim[i]
+        elif adj[i] >= dim[i]:
+            adj[i] -= dim[i]
 
     return adj
     
@@ -81,7 +81,7 @@ def dirFromNum(val, ldim):
         is Cartesian. Output will be a difference vector in the form of an
         array, which must be added to the current vector. """
     maxVal = 3 ** ldim - 1
-    if val > maxVal / 2:
+    if val >= maxVal / 2:
         val += 1
     arr = np.zeros(ldim, dtype=np.int32)
     # convert to base 3, for the conversion
@@ -164,6 +164,21 @@ def genRandGrid(dim, prob=0.5):
     intGrid = np.zeros(tuple(dim + 1), dtype=np.int8) # make an integer grid
     intGrid[alive] = 1
     return intGrid
+
+
+def gridToStr2D(grid):
+    """ Returns a string representation of grid, ignoring first row and column. """
+    dim = grid.shape
+    s = ""
+    for i in range(1,dim[0]):
+        s += "["
+        for j in range(1,dim[1]):
+            s += str(grid[i,j])
+            if j is not dim[1] - 1:
+                s += ", "
+        s += "]\n"
+    return s
+
     
 def addToTuple(tp, num):
     l = len(tp)
@@ -202,9 +217,7 @@ def evolve(dim, grid, adjGrid):
     while not it.finished:
         numAlive = 0
         for adj in adjGrid[it.multi_index]:
-            # avoid placeholder values
-            if adj[0] != -1:
-                numAlive += grid[tuple(adj)]
+             numAlive += grid[tuple(adj)]
         if numAlive == 3 or (numAlive == 2 and grid[it.multi_index] == 1):
             newGrid[it.multi_index] = 1
         it.iternext()
@@ -220,13 +233,10 @@ def evolve2D(rows, cols, grid, adjGrid, newGrid):
         for j in range(cols):
             numAlive = 0
             for k in range(maxLen):
-                # if adjGrid is configured, a placeholder value of (-1, -1)
-                # will
-                # result in a 0 being looked up in grid.
                 numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
 
             if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
-                newGrid[i + 1,j + 1] = 1
+                newGrid[i,j] = 1
 
 
 @cuda.jit(argtypes=[uint8[:,:], uint32[:,:,:,:], uint8[:,:]])
@@ -250,7 +260,7 @@ def evolve2D_kernel(grid, adjGrid, newGrid):
                 # result in a 0 being looked up in grid.
                 numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
             if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
-                newGrid[i + 1,j + 1] = 1
+                newGrid[i,j] = 1
     
 class Game:
     """ Initializes the game of life.

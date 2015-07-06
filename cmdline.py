@@ -23,24 +23,8 @@ def run_GPU(grid, adjGrid, steps, delay, initDelay, printInd, indSteps):
         # print grid
         if printInd is not -1 and step % printInd is 0:
             # in order to print grid, first need memory back in CPU
-            gr = d_grid.to_host()
-            grid_str = "STEP: " + str(step) + "\n"
-            grid_str += CmdInterface.horizontalLine(dim[1])
-            for i in range(dim[0]):
-                grid_str += "|"
-                for j in range(dim[1]):
-                    # add 1 to support configured grids
-                    if gr[i+1][j+1]:
-                        grid_str += "X"
-                    else:
-                        grid_str += " "
-                grid_str += "|\n"
-            # cross-platform way to clear command prompt, for the next round of
-            # printing the grid
-            grid_str += CmdInterface.horizontalLine(game.dim[1])
-            os.system('cls' if os.name == 'nt' else 'clear')
-            print(grid_str)
-            sys.stdout.flush()
+            d_grid.to_host()
+            printGrid(grid, step, dim)
         # print index
         if indSteps is not -1 and step % indSteps is 0:
             print("Step = " + str(step))
@@ -48,11 +32,13 @@ def run_GPU(grid, adjGrid, steps, delay, initDelay, printInd, indSteps):
         d_newGrid = cuda.to_device(newGrid)
         evolve2D_kernel[gridDim, blockDim](d_grid, d_adjGrid, d_newGrid)
         d_grid = d_newGrid
+        grid = newGrid
         sleep(delay)
         if step == 0:
             # allow initial position to be more easily visible
             sleep(initDelay)
         step += 1
+    d_grid.to_host()
 
     
 def run(game, steps, delay, initDelay, printInd, indSteps):
@@ -62,23 +48,7 @@ def run(game, steps, delay, initDelay, printInd, indSteps):
     while step < steps or steps == -1:
         # print grid
         if printInd is not -1 and step % printInd is 0:
-            grid_str = "STEP: " + str(step) + "\n"
-            grid_str += CmdInterface.horizontalLine(game.dim[1])
-            for i in range(game.dim[0]):
-                grid_str += "|"
-                for j in range(game.dim[1]):
-                    # add 1 to support configured grids
-                    if game.grid[i+1][j+1]:
-                        grid_str += "X"
-                    else:
-                        grid_str += " "
-                grid_str += "|\n"
-            # cross-platform way to clear command prompt, for the next round of
-            # printing the grid
-            grid_str += CmdInterface.horizontalLine(game.dim[1])
-            os.system('cls' if os.name == 'nt' else 'clear')
-            print(grid_str)
-            sys.stdout.flush()
+            printGrid(game.grid, step, game.dim)
         # print index
         if indSteps is not -1 and step % indSteps is 0:
             print("Step = " + str(step))
@@ -96,3 +66,22 @@ def horizontalLine(dim):
         line += "_"
     line += "|\n"
     return line
+
+def printGrid(grid, step, dim):
+    """ Prints the grid """
+    grid_str = "STEP: " + str(step) + "\n"
+    grid_str += horizontalLine(dim[1])
+    for i in range(dim[0]):
+        grid_str += "|"
+        for j in range(dim[1]):
+            if grid[i][j]:
+                grid_str += "X"
+            else:
+                grid_str += " "
+        grid_str += "|\n"
+    # cross-platform way to clear command prompt, for the next round of
+    # printing the grid
+    grid_str += horizontalLine(dim[1])
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(grid_str)
+    sys.stdout.flush()
