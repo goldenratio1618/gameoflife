@@ -6,86 +6,65 @@ from copy import deepcopy
 from cmdline import run, run_GPU
 from timeit import default_timer as timer
 import numpy as np
+import argparse
 
-#grid = []
-size = 192
-"""
-for a in range(size):
-    row = []
-    for b in range(size):
-        row.append(0)
-    grid.append(row)
+parser = argparse.ArgumentParser(description="Game of Life Analysis Frontend",
+                                 epilog="")
 
-# Makes an R-pentomino
-grid[size//2 - 1][size//2] = 1
-grid[size//2 - 1][size//2 + 1] = 1
-grid[size//2][size//2 - 1] = 1
-grid[size//2][size//2] = 1
-grid[size//2 + 1][size//2] = 1"""
 
-dim = np.array([size,size])
-#game = Game(genRandGrid(dim, prob=0.5), dim, lambda d, pos, currTuple, dist:
-#            smallWorldAdjFunc(torusAdjFunc, d, pos, currTuple, dist, 1))
-start = timer()
-grid = genRandGrid(dim, prob=0.5)
-dt = timer() - start
-print("Time to generate grid: %f" % dt)
-game = Game(grid, dim, torusAdjFunc)
-#print(game.adjGrid)
-"""
-for i in range(1000):
-    print(i)
-    sys.stdout.flush()
-    game.evolve2D()
-"""
-#GUI(game, delay=100)
-steps = 500
+def main():
+    #grid = []
+    """
+    for a in range(size):
+        row = []
+        for b in range(size):
+            row.append(0)
+        grid.append(row)
 
-start = timer()
-grid = run_GPU(game.grid, game.adjGrid, steps, 0, 0, 1, -1)
-dt = timer() - start
-print(str(steps) + " evolve steps created in %f s on GPU" % dt)
-#start = timer()
-#run(game, steps, 0, 0, 1, -1)
-#dt = timer() - start
-#print(str(steps) + " evolve steps created in %f s on CPU" % dt)
+    # Makes an R-pentomino
+    grid[size//2 - 1][size//2] = 1
+    grid[size//2 - 1][size//2 + 1] = 1
+    grid[size//2][size//2 - 1] = 1
+    grid[size//2][size//2] = 1
+    grid[size//2 + 1][size//2] = 1"""
 
-f = open("output7615.txt", "w")
-f.writelines(gridToStr2D(grid))
-f.writelines("\n\n\n")
-f.writelines("# Live Cells = " + str(countLiveCells(grid)) + "\n")
-f.writelines("Cluster = " + str(cluster(grid, game.adjGrid)))
-f.close()
+    dim = np.array([128,256])
+    #game = Game(genRandGrid(dim, prob=0.5), dim, lambda d, pos, currTuple, dist:
+    #            smallWorldAdjFunc(torusAdjFunc, d, pos, currTuple, dist, 1))
+    start = timer()
+    grid = genRandGrid(dim, prob=0.5)
+    dt = timer() - start
+    print("Time to generate grid: %f" % dt)
+    game = Game(grid, dim, torusAdjFunc, 5)
+    start = timer()
+    smallWorldIfy(game.adjGrid,0.25)
+    dt = timer() - start
+    print("Time to smallWorldIfy: %f" % dt)
+    #print(game.adjGrid)
+    """
+    for i in range(1000):
+        print(i)
+        sys.stdout.flush()
+        game.evolve2D()
+    """
+    #GUI(game, delay=100)
+    steps = 2000
 
-"""
-ORIGINAL (before Numpy refactoring):
-45.74s for only printing
-94.28s for only evolving the game (no printing)
+    start = timer()
+    grid = run_GPU(game.grid, game.adjGrid, steps, 0, 0, 2, -1)
+    dt = timer() - start
+    print(str(steps) + " evolve steps created in %f s on GPU" % dt)
+    #start = timer()
+    #run(game, steps, 0, 0, 1, -1)
+    #dt = timer() - start
+    #print(str(steps) + " evolve steps created in %f s on CPU" % dt)
 
-UPDATE 1 (after Numpy refactoring, before CPU compilation with Accelerate):
-100.59s for only evolving the game (no printing)
+    f = open("output71015.txt", "w")
+    f.writelines(gridToStr2D(grid))
+    f.writelines("\n\n\n")
+    f.writelines("# Live Cells = " + str(countLiveCells(grid)) + "\n")
+    f.writelines("Cluster = " + str(cluster(grid, game.adjGrid)))
+    f.close()
 
-UPDATE 2 (after Numpy refactoring for adjGrid as well, no Accelerate):
-169.77s
-
-UPDATE 3 (after Numpy refactoring, including int8 for adjGrid, still no Accelerate):
-1120.25s
-
-UPDATE 4 (code tweak)
-490.39s
-
-UPDATE 5 ("configuring" grid and AdjGrid to remove IF statement - still no Accelerate):
-469.4s
-
-UPDATE 6 (add AUTOJIT acceleration):
-1.32s
-
-**FASTER PERFORMANCE => MORE TESTS. FROM NOW ON, USING 5000 ITERATIONS**
-5.77s
-
-UPDATE 7 (with GPU enabled, Phase 1):
-8.24s
-
-UPDATE 8 (GPU enabled, Phase 2):
-4.99s
-"""
+if __name__ == '__main__':
+    main()

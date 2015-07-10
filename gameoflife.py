@@ -35,7 +35,7 @@ def torusAdjFunc(coord, dim):
     # this adjacency function does not use this many adjacent locations
     val = coord[ldim]
     if val >= 3 ** ldim - 1:
-        return np.full(ldim, ldim)
+        return dim
     arr = dirFromNum(val, ldim)
     adj = np.add(arr, pos)
 
@@ -47,8 +47,8 @@ def torusAdjFunc(coord, dim):
 
     return adj
     
-def smallWorldAdjFunc(prevAdjFunc, dim, pos, currTuple, dist, jumpProb):
-    """ Implements a small-world adjacency function.
+def randomizedAdjFunc(prevAdjFunc, dim, pos, currTuple, dist, jumpProb):
+    """ Implements a randomized adjacency function.
 
         Implements the previous adjacency function, with a probability of
         the random jumps characteristic of small-world networks.
@@ -69,17 +69,14 @@ def smallWorldAdjFunc(prevAdjFunc, dim, pos, currTuple, dist, jumpProb):
         return prevAdjFunc(dim, pos, currTuple, dist)
   
   
-  
-  
-
-""" Below are a variety of useful operations on the grid. """
 def dirFromNum(val, ldim):
     """ Returns the direction corresponding to an integer.
 
         Used to generate adjacency tables (i.e. the "space"). Operates using
         base 3, but excludes same point (0,0,...,0). Assumes the grid
         is Cartesian. Output will be a difference vector in the form of an
-        array, which must be added to the current vector. """
+        array, which must be added to the current vector. Assumes val does
+        not exceed maximum value (3^ldim-1). """
     maxVal = 3 ** ldim - 1
     if val >= maxVal / 2:
         val += 1
@@ -88,11 +85,14 @@ def dirFromNum(val, ldim):
     for i in range(ldim):
         arr[ldim - i - 1] = val % 3 - 1
         val = val // 3
-    return arr
+    return arr  
+  
 
-def rmFirst(t):
-    """ Removes the first element of a tuple. """
-    return tuple(t[i] for i in range(1, len(t)))
+""" Below are a variety of useful operations on the grid. """
+
+
+
+
 
 def initAdjGrid(adjFunc, dim, extraSpace):
     """ Initializes a grid from an adjacency function.
@@ -113,42 +113,73 @@ def initAdjGrid(adjFunc, dim, extraSpace):
         it.iternext()
     return adjGrid
     
-def convAdjGrid(adjGrid, dim):
-    """ Converts the adjacency grid from a Numpy object array to the much more
-        efficient int32 array (which supports grids up to 32767 rows or columns)
-        
-        So as to enable Numpy to store this array as an array of integers,
-        rather than objects (in particular, lists of tuples), "placeholder"
-        values of [-1, -1] are inserted - this allows Numpy to use int8
-        data-type, but the placeholder values have to be discounted.
-        
-        This method needs to be run after all adjGrid conversions have been
-        completed.
-    """
-    # size of adjGrid, not including internal arrays
-    size = adjGrid.shape
-    # maximum length - this will be incorporated into the new shape
-    maxLen = 0
-    it = np.nditer(adjGrid, flags=['multi_index', 'refs_ok'],
-        op_flags=['readonly'])
+
+def smallWorldIfy(adjGrid, jumpProb):
+    """ Turns the adjacency grid into a small-world network.
+        This works as follows: for each edge, we rewire it into
+        a random edge (with the same starting vertex) with a given
+        probability. Assumes initial adjGrid is torus-like."""
+    # we need to iterate over this to keep tuples intact
+    ldim = len(adjGrid.shape) - 2
+    dim = adjGrid.shape[0:ldim]
+    iter_arr = np.empty(adjGrid.shape[0:ldim+1], dtype=np.int8)
+    dim = np.array(dim)
+    it = np.nditer(iter_arr, flags=['multi_index'])
+    maxIndex = 3 ** ldim - 1
+
     while not it.finished:
-        if maxLen < len(adjGrid[it.multi_index]):
-            maxLen = len(adjGrid[it.multi_index])
+        # only consider left-facing edges (plus down) - that way we
+        # count each edge exactly once (the other edges will be counted
+        # when we iterate to the corresponding neighbor vertices).
+        if it.multi_index[ldim] >= maxIndex / 2:
+            it.iternext()
+            continue
+
+        # do not change this edge
+        if np.random.random() > jumpProb:
+            it.iternext()
+            continue
+
+        # TODO: Swap our edge (it.multi_index[...], adjGrid[...]) for
+        # a new, random edge (it.multi_index[...], ???) with prob. jP
+        
+        # the location in question, and the adjacent location
+        loc = it.multi_index[0:ldim]
+        adjLoc = tuple(adjGrid[it.multi_index])
+
+        # new, random location that the edge will connect to
+        newLoc = getRandLoc(dim, loc)
+        
+        # add backwards edge from newLoc to loc
+        # to do this we replace first available blank space
+        added = False
+        for i in range(len(adjGrid[newLoc])):
+            if (adjGrid[newLoc + (i,)] == dim).all():
+                adjGrid[newLoc + (i,)] = np.array(loc)
+                added = True
+                break
+        
+        # we never added edge: print warning message and continue
+        # to next location
+        if not added:
+            print("WARNING: Failed to write edge from " + str(loc) + " to " +
+                  str(tuple(newLoc)) + ". Try adding more extra space.")
+            it.iternext()
+            continue
+
+
+        # replace forwards edge with random edge (not to same vertex)
+        adjGrid[it.multi_index] = np.array(newLoc)
+
+        # remove backwards edge from adjLoc to loc
+        for i in range(len(adjGrid[adjLoc])):
+            if (adjGrid[adjLoc + (i,)] == np.array(loc)).all():
+                adjGrid[adjLoc + (i,)] = dim
+                break
+
         it.iternext()
-    # number of elements in each tuple is the number of dimensions
-    newGrid = np.full(size + (maxLen, len(dim)), -1, dtype=np.int32)
-    it = np.nditer(adjGrid, flags=['multi_index', 'refs_ok'],
-        op_flags=['readonly'])
-    while not it.finished:
-        for adjPos in range(len(adjGrid[it.multi_index])):
-            for coord in range(len(dim)):
-                # copy element over to new grid
-                newGrid[it.multi_index][adjPos][coord] = \
-                    adjGrid[it.multi_index][adjPos][coord]
-        it.iternext()
-    return newGrid
-    
-    
+
+
     
 def getRandLoc(dim, loc=None):
     """ Generates a random location in the grid, that isn't loc. """
@@ -156,7 +187,19 @@ def getRandLoc(dim, loc=None):
     while newLoc == loc:
         newLoc = tuple(np.random.randint(0, dim[i]) for i in range(len(dim)))
     return newLoc
+
+
+
     
+def getRandEdge(adjGrid, dim):
+    """ Gets a random edge in the adjacency grid. """
+    loc = getRandLoc(dim)
+    # we need a location that has an edge from it
+    while len(adjGrid[loc]) is 0:
+        loc = genRandLoc(dim)
+
+
+
 def genRandGrid(dim, prob=0.5):
     """ Generates a random grid with a given cell density. """
     grid = np.random.random(tuple(dim))
@@ -187,22 +230,7 @@ def addToTuple(tp, num):
         newTp[i] += num
     return tuple(newTp)
 
-def configure(grid, adjGrid):
-    """ Configures grid and adjGrid for higher efficiency, i.e no using that
-        troublesome if statement. """
-    dim = addToTuple(grid.shape, 1)
-    newGrid = np.zeros(dim, dtype=np.int8)
-    it = np.nditer(grid, flags=['multi_index'], op_flags=['readonly'])
-    while not it.finished:
-        newGrid[addToTuple(it.multi_index, 1)] = grid[it.multi_index]
-        it.iternext()
-    
-    newAdjGrid = np.empty_like(adjGrid)
-    it = np.nditer(grid, flags=['multi_index'], op_flags=['readonly'])
-    while not it.finished:
-        newAdjGrid[it.multi_index] = adjGrid[it.multi_index] + 1
-        it.iternext()
-    return (newGrid, newAdjGrid)
+
     
     
 """ Evolution methods. These are placed outside the class for clarity, and to
