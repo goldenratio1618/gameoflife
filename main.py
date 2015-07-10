@@ -11,6 +11,58 @@ import argparse
 parser = argparse.ArgumentParser(description="Game of Life Analysis Frontend",
                                  epilog="")
 
+parser.add_argument('-f', '--frac', help="Fraction of cells alive at beginning",
+                    type=float, default=0.5)
+
+parser.add_argument('-r', '--rows', help="Number of rows of the grid",
+                    type=int, default=128)
+
+parser.add_argument('-c', "--cols", help="Number of columns of the grid",
+                    type=int, default=256)
+
+parser.add_argument('-e', "--extraspace",
+                    help="Amount of extra space to add to adjacency grid",
+                    type=int, default=5)
+
+parser.add_argument('-v', "--visible", help="Number of steps to show grid",
+                    type=int, default=-1)
+
+parser.add_argument('-n', "--niters", help=("Number of times to run simulation "
+                                            "per each value of small world "
+                                            "coefficient"),
+                    type=int, default=1)
+
+parser.add_argument('-l', "--simlength", help="Length of each simulation",
+                    type=int, default=1000)
+
+parser.add_argument('-ms', "--minswc", help="Minimum small world coefficient",
+                    type=float, default=0)
+
+parser.add_argument('-xs', "--maxswc", help="Maximum small world coefficient",
+                    type=float, default=0)
+
+parser.add_argument('-ss', "--stepswc", help="Step for small world coefficient",
+                    type=float, default=1)
+
+parser.add_argument('-o', "--output",
+                    help=("Specify output format. Options:\n"
+                           "0: do not output to file\n"
+                           "1: output averages of final values across all "
+                           "simulations per given small world coefficient\n"
+                           "2: output final values for every simulation\n"
+                           "3: output values for every step in every "
+                           "simulation\n"
+                           "4: output grid state at every step in every "
+                           "simulation"),
+                    type=int, default=1)
+
+parser.add_argument('-d', "--debug", help="Enter debug mode",
+                    action='store_true', default=False)
+
+args = parser.parse_args()
+
+print(args)
+
 
 def main():
     #grid = []
@@ -29,7 +81,8 @@ def main():
     grid[size//2 + 1][size//2] = 1"""
 
     dim = np.array([128,256])
-    #game = Game(genRandGrid(dim, prob=0.5), dim, lambda d, pos, currTuple, dist:
+    #game = Game(genRandGrid(dim, prob=0.5), dim, lambda d, pos, currTuple,
+    #dist:
     #            smallWorldAdjFunc(torusAdjFunc, d, pos, currTuple, dist, 1))
     start = timer()
     grid = genRandGrid(dim, prob=0.5)
@@ -66,5 +119,7 @@ def main():
     f.writelines("Cluster = " + str(cluster(grid, game.adjGrid)))
     f.close()
 
+    """
 if __name__ == '__main__':
     main()
+    """
