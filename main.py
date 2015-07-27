@@ -8,6 +8,7 @@ from timeit import default_timer as timer
 import numpy as np
 import argparse
 import datetime
+import os
 
 parser = argparse.ArgumentParser(description="Game of Life Analysis Frontend",
                                  epilog="")
@@ -55,21 +56,27 @@ parser.add_argument('-d', "--debug", help="Enter debug mode",
 parser.add_argument('-s', "--sample", help="When using output modes 3 or 4, how often should the grid be sampled?",
                     type=int, default=10)
 
+parser.add_argument('-of', "--outfile", help="Output file to store data in", default="D:/Dropbox/Documents/gameoflife_data/")
+
 args = parser.parse_args()
 
 start = datetime.datetime.now()
-# this will be appended to the beginning of all datafiles to avoid overwriting
-datestr = start.strftime("%m-%d-%Y_%H-%M-%S")
+# all new datafiles will be stored in this folder
+folder = start.strftime("%m-%d-%Y_%H-%M-%S") + "/"
+# this folder is "guaranteed" to be unique, so no need to check if dir exists
+os.mkdir(args.outfile + folder)
+for i in range(1,args.output+1):
+    os.mkdir(args.outfile + folder + "/data" + str(i) + "/")
 # add extra parameters
-datestr += "_frac=" + str(args.frac) + "_rows=" + str(args.rows) + "_cols=" + \
+datestr = "frac=" + str(args.frac) + "_rows=" + str(args.rows) + "_cols=" + \
     str(args.cols) + "_extraspace=" + str(args.extraspace) + "_niters=" + \
     str(args.niters) + "_simlength=" + str(args.simlength)
 
 if args.output >= 1:
     # this file stores averages of final values across all simulations per swc
-    outfile_avg = open("data1/" + datestr + ".txt", "w")
-    # will be structured as a table with these 3 columns
-    outfile_avg.writelines("SWC  LiveCells  Cluster\n")
+    outfile_avg = open(args.outfile + folder + "data1/" + datestr + ".txt", "w")
+    # will be structured as a table with these 5 columns
+    outfile_avg.writelines("SWC  LiveCells Std Cluster Std\n")
 
 def main():
     start = timer()
@@ -102,8 +109,8 @@ def main():
                 print("Sim = " + str(sim) + ". Time elapsed: " + str(timer() - start))
             # make file to output live cell count and cluster every step
             if args.output >= 3:
-                outfile_steps = open("data3/" + datestr + "_swc=" + strswc +\
-                    "_sim=" + str(sim) + ".txt", "w")
+                outfile_steps = open(args.outfile + folder + "data3/" + "swc=" + strswc +\
+                    "_sim=" + str(sim) + datestr + ".txt", "w")
                 outfile_steps.writelines("Step  LiveCells Mean Std  Cluster Mean Std\n")
             # reset grid to fresh state
             game.grid = genRandGrid(dim, prob=args.frac)
@@ -124,7 +131,7 @@ def main():
                     game.grid = grid
                     # make file, and output grid to that file
                     if args.output >= 4:
-                        outfile_grids = open("data4/" + datestr + "_swc=" + strswc + "_sim=" + str(sim) + "_step=" + str(step * args.sample), "w")
+                        outfile_grids = open(args.outfile + folder + "data4/" + "swc=" + strswc + "_sim=" + str(sim) + "_step=" + str(step * args.sample) + datestr + ".txt", "w")
                         printGrid(grid, -1, grid.shape, outfile_grids)
                         outfile_grids.close()
 
@@ -149,7 +156,7 @@ def main():
         # make and output file of range of different final values in
         # simulations
         if args.output >= 2:
-            outfile_final = open("data2/" + datestr + "_swc=" + strswc + ".txt", "w")
+            outfile_final = open(args.outfile + folder + "data2/" + "_swc=" + strswc + datestr + ".txt", "w")
             outfile_final.writelines("Run  LiveCells  Cluster\n")
             for i in range(len(livecells)):
                 outfile_final.writelines(str(i) + "    " + str(livecells[i]) + "    " + str(round(cl[i], 6)) + "\n")
