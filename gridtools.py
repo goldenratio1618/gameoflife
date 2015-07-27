@@ -1,5 +1,6 @@
-import numpy as np
+﻿import numpy as np
 from gameoflife import addToTuple
+from numba import *
 
 def countLiveCells(grid):
     """ Returns the number of live cells in the grid.
@@ -10,6 +11,7 @@ def countLiveCells(grid):
         count += val
     return count
 
+@autojit
 def cluster(grid, adjGrid):
     """ Returns the probability that neighbors of live cells are live
    
@@ -19,26 +21,38 @@ def cluster(grid, adjGrid):
     if countLiveCells(grid) == 0:
         return 0 # nothing is alive; cluster is 0
     it = np.nditer(grid, flags=['multi_index'])
-    matches = 0 # number of cells that match their neighbors
-    total = 0 # total number of cells
+    matches = 0 # number of neighbors of live cells that are live
+    total = 0 # total number of neighbors of live cells
     while not it.finished:
         flag = False
-        for x in it.multi_index:
-            if x == 0:
+
+        for i in range(len(it.multi_index)):
+            # do not record situations where we're in dead zone of grid
+            if it.multi_index[i] == grid.shape[i] - 1:
                 flag = True
+
         if flag:
             it.iternext()
-            continue # do not record situations where we're in dead zone of grid
+            continue
         
-        # add -1 to coordinate, since first row/col of grid are 0
-        for adj in adjGrid[addToTuple(it.multi_index, -1)]:
+        for adj in adjGrid[it.multi_index]:
             # do not record situations where adjacent cell is in dead zone
-            if adj[0] != 0:
-                # we only care about live cell matches
-                if grid[it.multi_index] == 1:
-                    total+= 1
-                    if grid[tuple(adj)] == 1:
-                        matches += 1
+            flag = False
+
+            for i in range(len(it.multi_index)):
+                # do not record situations where we're in dead zone of grid
+                if adj[i] == grid.shape[i] - 1:
+                    flag = True
+
+            if flag:
+                continue
+
+            loc = tuple(adj)
+            # we only care about live cell matches
+            if grid[it.multi_index] == 1:
+                total += 1
+                if grid[loc] == 1:
+                    matches += 1
         it.iternext()
     return matches/total
     

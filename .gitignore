@@ -41,3 +41,10 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Data files (these will be moved to Dropbox eventually)
+data1
+data2
+data3
+data4
+data

@@ -68,13 +68,15 @@ def horizontalLine(dim):
     line += "|\n"
     return line
 
-def printGrid(grid, step, dim):
+def printGrid(grid, step, dim, file=None):
     """ Prints the grid """
-    grid_str = "STEP: " + str(step) + "\n"
-    grid_str += horizontalLine(dim[1])
-    for i in range(dim[0]):
+    grid_str = ""
+    if step is not -1:
+        grid_str += "STEP: " + str(step) + "\n"
+    grid_str += horizontalLine(dim[1]-1)
+    for i in range(dim[0]-1):
         grid_str += "|"
-        for j in range(dim[1]):
+        for j in range(dim[1]-1):
             if grid[i][j]:
                 grid_str += "X"
             else:
@@ -82,7 +84,10 @@ def printGrid(grid, step, dim):
         grid_str += "|\n"
     # cross-platform way to clear command prompt, for the next round of
     # printing the grid
-    grid_str += horizontalLine(dim[1])
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(grid_str)
-    sys.stdout.flush()
+    grid_str += horizontalLine(dim[1]-1)
+    if file is None:
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print(grid_str)
+        sys.stdout.flush()
+    else:
+        file.writelines(grid_str)

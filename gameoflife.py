@@ -1,4 +1,4 @@
-from copy import deepcopy
+﻿from copy import deepcopy
 from math import floor
 from numbapro import cuda
 from numba import *
@@ -113,7 +113,7 @@ def initAdjGrid(adjFunc, dim, extraSpace):
         it.iternext()
     return adjGrid
     
-
+@autojit
 def smallWorldIfy(adjGrid, jumpProb):
     """ Turns the adjacency grid into a small-world network.
         This works as follows: for each edge, we rewire it into
