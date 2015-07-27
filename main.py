@@ -156,7 +156,7 @@ def main():
         # make and output file of range of different final values in
         # simulations
         if args.output >= 2:
-            outfile_final = open(args.outfile + folder + "data2/" + "_swc=" + strswc + datestr + ".txt", "w")
+            outfile_final = open(args.outfile + folder + "data2/" + "swc=" + strswc + datestr + ".txt", "w")
             outfile_final.writelines("Run  LiveCells  Cluster\n")
             for i in range(len(livecells)):
                 outfile_final.writelines(str(i) + "    " + str(livecells[i]) + "    " + str(round(cl[i], 6)) + "\n")
