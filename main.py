@@ -111,9 +111,10 @@ def main():
             if args.output >= 3:
                 outfile_steps = open(args.outfile + folder + "data3/" + "swc=" + strswc +\
                     "_sim=" + str(sim) + datestr + ".txt", "w")
-                outfile_steps.writelines("Step  LiveCells Mean Std  Cluster Mean Std\n")
+                outfile_steps.writelines("Step  LiveCells Cluster\n")
             # reset grid to fresh state
             game.grid = genRandGrid(dim, prob=args.frac)
+            grid = game.grid
             if args.debug:
                 print("Grid reset. Time elapsed: " + str(timer() - start))
             steps = args.simlength

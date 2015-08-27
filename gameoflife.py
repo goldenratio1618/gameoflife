@@ -140,9 +140,6 @@ def smallWorldIfy(adjGrid, jumpProb):
             it.iternext()
             continue
 
-        # TODO: Swap our edge (it.multi_index[...], adjGrid[...]) for
-        # a new, random edge (it.multi_index[...], ???) with prob. jP
-        
         # the location in question, and the adjacent location
         loc = it.multi_index[0:ldim]
         adjLoc = tuple(adjGrid[it.multi_index])
