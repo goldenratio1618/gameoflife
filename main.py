@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description="Game of Life Analysis Frontend",
                                  epilog="")
 
 parser.add_argument('-f', '--frac', help="Fraction of cells alive at beginning",
-                    type=float, default=0.5) #
+                    type=float, default=0.35) #
 parser.add_argument('-r', '--rows', help="Number of rows of the grid",
                     type=int, default=128) #
 parser.add_argument('-c', "--cols", help="Number of columns of the grid",
@@ -49,8 +49,17 @@ parser.add_argument('-o', "--output",
                            "Higher numbers also output everything for all lower"
                            " numbers, e.g. 3 will also output 2\n"),
                     type=int, default=1)
+                    
+parser.add_argument('-p', '--replace', help="Remove edges when constructing small world",
+                    action="store_false", default=True)
+                           
+parser.add_argument('-g', '--heterogeneity', help="Heterogeneity of SWN",
+                    type=float, default=0)
 
-parser.add_argument('-d', "--debug", help="Enter debug mode",
+parser.add_argument('-d', "--delay", help="Time delay between steps",
+                    type=float, default=0)
+                    
+parser.add_argument('-db', "--debug", help="Enter debug mode",
                     action='store_true', default=False)
 
 parser.add_argument('-s', "--sample", help="When using output modes 3 or 4, how often should the grid be sampled?",
@@ -72,6 +81,8 @@ datestr = "frac=" + str(args.frac) + "_rows=" + str(args.rows) + "_cols=" + \
     str(args.cols) + "_extraspace=" + str(args.extraspace) + "_niters=" + \
     str(args.niters) + "_simlength=" + str(args.simlength)
 
+np.set_printoptions(threshold=np.inf)
+    
 if args.output >= 1:
     # this file stores averages of final values across all simulations per swc
     outfile_avg = open(args.outfile + folder + "data1/" + datestr + ".txt", "w")
@@ -97,8 +108,9 @@ def main():
         strswc = str(round(swc, 6))
         if args.debug:
             print("SWC = " + strswc + ". Time elapsed: " + str(timer() - start))
-        smallWorldIfy(game.adjGrid,swc)
+        smallWorldIfyHeterogeneous(game.adjGrid, swc, args.heterogeneity, args.replace)
         if args.debug:
+            print(game.adjGrid)
             print("Grid smallworldified. Time elapsed: " + str(timer() - start))
         # these will be arrays of the values for every simulation
         livecells = np.zeros(args.niters)
@@ -119,7 +131,7 @@ def main():
                 print("Grid reset. Time elapsed: " + str(timer() - start))
             steps = args.simlength
             if args.output < 3:
-                grid = run_GPU(game.grid, game.adjGrid, steps, 0, 0,
+                grid = run_GPU(game.grid, game.adjGrid, steps, args.delay, 0,
                                args.visible, -1)
             else:
                 for step in range(steps//args.sample + 1):
@@ -128,7 +140,7 @@ def main():
                     # output data to file
                     outfile_steps.writelines(str(step * args.sample) + "    " + str(countLiveCells(grid)) + "    " + str(cluster(grid, game.adjGrid)) + "\n")
                     # step once
-                    grid = run_GPU(game.grid, game.adjGrid, args.sample, 0, 0, args.visible, -1)
+                    grid = run_GPU(game.grid, game.adjGrid, args.sample, args.delay, 0, args.visible, -1)
                     game.grid = grid
                     # make file, and output grid to that file
                     if args.output >= 4:

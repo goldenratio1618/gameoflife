@@ -104,14 +104,108 @@ def initAdjGrid(adjFunc, dim, extraSpace):
     
     ldim = len(dim)
     buffer = (3 ** ldim - 1) * extraSpace
-    adjGrid = np.zeros(tuple(dim) + (buffer * extraSpace, ldim), dtype=np.int32)
+    adjGrid = np.zeros(tuple(dim) + (buffer, ldim), dtype=np.int32)
     # the array we iterate over, to get the multi_index of the iterator
-    iter_arr = np.empty(tuple(dim) + (buffer * extraSpace,), dtype=np.int8)
+    iter_arr = np.empty(tuple(dim) + (buffer,), dtype=np.int8)
     it = np.nditer(iter_arr, flags=['multi_index'])
     while not it.finished:
         adjGrid[it.multi_index] = adjFunc(np.array(it.multi_index), dim)
         it.iternext()
     return adjGrid
+
+
+@autojit
+def smallWorldIfyHeterogeneous(adjGrid, jumpProb, heterogeneity=0, replace=True):
+    """ Turns the adjacency grid into a small-world network.
+        This works as follows: for each edge, we rewire it into
+        a random edge (with the same starting vertex) with a given
+        probability, if replace. Otherwise, we simply add extra edges.
+        The SWN will have tunable heterogeneity. Unlike other method,
+        new edges are COMPLETELY random - they do not have same starting vertex.
+        Assumes initial adjGrid is torus-like."""
+    # we need to iterate over this to keep tuples intact
+    ldim = len(adjGrid.shape) - 2
+    dim = adjGrid.shape[0:ldim]
+    iter_arr = np.empty(adjGrid.shape[0:ldim+1], dtype=np.int8)
+    dim = np.array(dim)
+    it = np.nditer(iter_arr, flags=['multi_index'])
+    maxIndex = 3 ** ldim - 1
+
+    while not it.finished:
+        # only consider left-facing edges (plus down) - that way we
+        # count each edge exactly once (the other edges will be counted
+        # when we iterate to the corresponding neighbor vertices).
+        if it.multi_index[ldim] >= maxIndex / 2:
+            it.iternext()
+            continue
+
+        # do not change this edge
+        if np.random.random() > jumpProb:
+            it.iternext()
+            continue
+
+        # the edge we are about to remove
+        loc = it.multi_index[0:ldim]
+        adjLoc = tuple(adjGrid[it.multi_index])
+
+        
+        # an edge already exists bewtween the two new locations (i.e. we need to resample)
+        edgeExists = True
+        # new, random locations for the new edge
+        while edgeExists:
+            newLoc = getRandLoc(dim)
+            newAdjLoc = getRandLoc(dim, newLoc)
+            edgeExists = False
+            # check if an edge already exists between these two vertices
+            for i in range(len(adjGrid[newLoc])):
+                if (adjGrid[newLoc + (i,)] == newAdjLoc).all():
+                    edgeExists = True
+        
+        
+        
+        # add edge from newLoc to newAdjLoc
+        # to do this we replace first available blank space
+        added = False
+        for i in range(len(adjGrid[newLoc])):
+            if (adjGrid[newLoc + (i,)] == dim).all():
+                adjGrid[newLoc + (i,)] = np.array(newAdjLoc)
+                added = True
+                break
+        
+        # add reverse edge from newAdjLoc to newLoc
+        addedRev = False
+        for i in range(len(adjGrid[newAdjLoc])):
+            if (adjGrid[newAdjLoc + (i,)] == dim).all():
+                adjGrid[newAdjLoc + (i,)] = np.array(newLoc)
+                addedRev = True
+                break
+        
+        # we never added edge: print warning message and continue
+        # to next location
+        if not added:
+            print("WARNING: Failed to write edge from " + str(newLoc) + " to " +
+                  str(tuple(newAdjLoc)) + ". Try adding more extra space.")
+            it.iternext()
+            continue
+
+        if not addedRev:
+            print("WARNING: Failed to write edge from " + str(newAdjLoc) + " to " +
+                  str(tuple(newLoc)) + ". Try adding more extra space.")
+            it.iternext()
+            continue
+           
+        # remove original edges
+        if replace:
+            # delete original forwards edge from loc to adjLoc
+            adjGrid[it.multi_index] = dim
+
+            # remove backwards edge from adjLoc to loc
+            for i in range(len(adjGrid[adjLoc])):
+                if (adjGrid[adjLoc + (i,)] == np.array(loc)).all():
+                    adjGrid[adjLoc + (i,)] = dim
+                    break
+
+        it.iternext()
     
 @autojit
 def smallWorldIfy(adjGrid, jumpProb):
@@ -280,9 +374,8 @@ def evolve2D_kernel(grid, adjGrid, newGrid):
         for j in range(startY, cols, gridY):
             numAlive = 0
             for k in range(maxLen):
-                # if adjGrid is configured, a placeholder value of (-1, -1)
-                # will
-                # result in a 0 being looked up in grid.
+                # if adjGrid is configured, a placeholder value of dim
+                # will result in a 0 being looked up (as desired)
                 numAlive += grid[adjGrid[i,j,k,0], adjGrid[i,j,k,1]]
             if numAlive == 3 or (numAlive == 2 and grid[i,j] == 1):
                 newGrid[i,j] = 1
