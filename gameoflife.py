@@ -4,6 +4,7 @@ from numbapro import cuda
 from numba import *
 import numpy as np
 from timeit import default_timer as timer
+from random import randrange
 
 """ Below are a variety of adjacency functions, which can be used
     to generate grids of various topologies for the Game of Life. """
@@ -113,6 +114,25 @@ def initAdjGrid(adjFunc, dim, extraSpace):
         it.iternext()
     return adjGrid
 
+@autojit
+def getHubs(numHubs, ldim, adjGridShape):
+    hubs = np.empty((len(numHubs), ldim))
+    
+    filled = 0
+    count = 0
+    allVertices = np.empty(adjGridShape[0:ldim])
+    it = np.nditer(allVertices, flags=['multi_index'])
+    while not it.finished:
+        if count in numHubs:
+            hubs[filled] = np.array(it.multi_index)
+            filled += 1
+        count += 1
+        it.iternext()
+
+    if filled != len(hubs):
+        print("WARNING: Incorrect number of hubs.")
+    
+    return hubs
 
 @autojit
 def smallWorldIfyHeterogeneous(adjGrid, jumpProb, heterogeneity=0, replace=True):
@@ -130,6 +150,9 @@ def smallWorldIfyHeterogeneous(adjGrid, jumpProb, heterogeneity=0, replace=True)
     dim = np.array(dim)
     it = np.nditer(iter_arr, flags=['multi_index'])
     maxIndex = 3 ** ldim - 1
+    
+    numVertices = np.prod(adjGrid.shape[0:ldim])
+    hubs = getHubs(np.random.choice(numVertices, (1 - heterogeneity) * numVertices, replace=False), ldim, adjGrid.shape)
 
     while not it.finished:
         # only consider left-facing edges (plus down) - that way we
@@ -153,7 +176,9 @@ def smallWorldIfyHeterogeneous(adjGrid, jumpProb, heterogeneity=0, replace=True)
         edgeExists = True
         # new, random locations for the new edge
         while edgeExists:
-            newLoc = getRandLoc(dim)
+            # one of the locations must be a hub
+            newLocPos = randrange(0, len(hubs))
+            newLoc = tuple(hubs[newLocPos])
             newAdjLoc = getRandLoc(dim, newLoc)
             edgeExists = False
             # check if an edge already exists between these two vertices

@@ -79,7 +79,8 @@ for i in range(1,args.output+1):
 # add extra parameters
 datestr = "frac=" + str(args.frac) + "_rows=" + str(args.rows) + "_cols=" + \
     str(args.cols) + "_extraspace=" + str(args.extraspace) + "_niters=" + \
-    str(args.niters) + "_simlength=" + str(args.simlength)
+    str(args.niters) + "_simlength=" + str(args.simlength) + "_replace=" + \
+    str(args.replace) + "_heterogeneity=" + str(args.heterogeneity)
 
 np.set_printoptions(threshold=np.inf)
     
