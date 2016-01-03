@@ -153,6 +153,9 @@ def smallWorldIfyHeterogeneous(adjGrid, jumpProb, heterogeneity=0, replace=True)
     
     numVertices = np.prod(adjGrid.shape[0:ldim])
     hubs = getHubs(np.random.choice(numVertices, (1 - heterogeneity) * numVertices, replace=False), ldim, adjGrid.shape)
+    
+    
+    print("Number of hubs: " + len(hubs))
 
     while not it.finished:
         # only consider left-facing edges (plus down) - that way we
