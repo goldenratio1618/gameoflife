@@ -1,10 +1,20 @@
 ﻿from copy import deepcopy
 from math import floor
+import cmath
 from numbapro import cuda
 from numba import *
 import numpy as np
 from timeit import default_timer as timer
 from random import randrange
+
+""" Code for initializing fitness values for each location in grid."""
+def initFitnesses(dim, payoffMatrix, adjGrid, grid):
+
+def computeFitness(dim, payoffMatrix, adjGrid, grid, loc):
+    """ Computes the fitness of the individual at location loc. """
+    payoff = 0
+    for adjLoc in adjGrid[loc]:
+        payoff += grid[adjLoc]
 
 """ Below are a variety of adjacency functions, which can be used
     to generate grids of various topologies for the Game of Life. """
@@ -316,6 +326,8 @@ def getRandEdge(adjGrid, dim):
     # we need a location that has an edge from it
     while len(adjGrid[loc]) is 0:
         loc = genRandLoc(dim)
+    loc2 = adjGrid[loc][np.random.randint(0,len(adjGrid[loc]))]
+    return [loc, loc2]
 
 
 
